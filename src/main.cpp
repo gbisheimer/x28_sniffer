@@ -19,10 +19,10 @@ unsigned int loop_duration_cnt = 0;
 typedef union {
   struct
   {
-    bool parity;
-    int ID : 3;
-    int cmd : 8;
-    int checksum : 4;
+    unsigned parity : 1;
+    unsigned id : 3;
+    unsigned data : 8;
+    unsigned checksum : 4;
   };
   unsigned int word;
 } MPX_packet;
@@ -53,23 +53,20 @@ int MPX_buffer_index;
 void setup_GPIOs()
 {
   Serial.println("Setup GPIOs");
-  pinMode(RX_PIN, INPUT);
-  digitalWrite(TX_PIN, 0);
-  pinMode(TX_PIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, 0);
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void setup_RCSwitch()
 {
   Serial.println("Setup RCSwitch: RX on pin 2. TX on pin 13");
   
-  // Transmitter is connected to Arduino Pin #13
-  mySwitch.enableTransmit(13);
+  // Transmitter is connected to Arduino Pin #3
+  // mySwitch.enableTransmit(3);
 
   // Receiver on pin #2 => that is inerrupt 0
   mySwitch.enableReceive(digitalPinToInterrupt(2));
-
-  // Optional set protocol (default is 1, will work for most outlets)
-  mySwitch.setProtocol(13);
+  mySwitch.setReceiveTolerance(90);
 }
 
 // ***********************************************************
@@ -109,27 +106,31 @@ void loop()
 
   timers();
 
+  digitalWrite(LED_BUILTIN, !digitalRead(2));
+
   if (mySwitch.available())
   {
+    MPX_packet packet;
+    packet.word = mySwitch.getReceivedValue();
 
-    int value = mySwitch.getReceivedValue();
-
-    if (value == 0)
-    {
-      Serial.print("Unknown encoding");
-    }
-    else
-    {
-      Serial.print("Received ");
-      Serial.print(mySwitch.getReceivedValue());
-      Serial.print(" / ");
-      Serial.print(mySwitch.getReceivedBitlength());
-      Serial.print("bit ");
-      Serial.print("Protocol: ");
-      Serial.println(mySwitch.getReceivedProtocol());
-    }
+    Serial.print(millis());
+    Serial.print(": ");
+    Serial.print(packet.word, 16);
+    Serial.print(" - ");
+    Serial.print(packet.parity);
+    Serial.print(", ");
+    Serial.print(packet.id, 16);
+    Serial.print(", ");
+    Serial.print(packet.data, 16);
+    Serial.print(", ");
+    Serial.println(packet.checksum, 16);
 
     mySwitch.resetAvailable();
+  }
+
+  if( pulso_1s )
+  {
+    ;
   }
 
   loop_duration_acum += (unsigned int)(micros() - start_time);

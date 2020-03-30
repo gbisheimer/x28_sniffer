@@ -74,19 +74,7 @@ static const RCSwitch::Protocol proto[] = {
 #else
 static const RCSwitch::Protocol PROGMEM proto[] = {
 #endif
-  { 350, {  1, 31 }, {  1,  3 }, {  3,  1 }, false },    // protocol 1
-  { 650, {  1, 10 }, {  1,  2 }, {  2,  1 }, false },    // protocol 2
-  { 100, { 30, 71 }, {  4, 11 }, {  9,  6 }, false },    // protocol 3
-  { 380, {  1,  6 }, {  1,  3 }, {  3,  1 }, false },    // protocol 4
-  { 500, {  6, 14 }, {  1,  2 }, {  2,  1 }, false },    // protocol 5
-  { 450, { 23,  1 }, {  1,  2 }, {  2,  1 }, true },     // protocol 6 (HT6P20B)
-  { 150, {  2, 62 }, {  1,  6 }, {  6,  1 }, false },    // protocol 7 (HS2303-PT, i. e. used in AUKEY Remote)
-  { 200, {  3, 130}, {  7, 16 }, {  3,  16}, false},     // protocol 8 Conrad RS-200 RX
-  { 200, { 130, 7 }, {  16, 7 }, { 16,  3 }, true},      // protocol 9 Conrad RS-200 TX
-  { 365, { 18,  1 }, {  3,  1 }, {  1,  3 }, true },     // protocol 10 (1ByOne Doorbell)
-  { 270, { 36,  1 }, {  1,  2 }, {  2,  1 }, true },     // protocol 11 (HT12E)
-  { 320, { 36,  1 }, {  1,  2 }, {  2,  1 }, true },     // protocol 12 (SM5212)
-  { 1270, { 0, 1 }, { 1, 2 }, { 2, 1 }, true }          // protocol 13 ( MPX-X28 )
+  { 1270, { 1, 1 }, { 1, 2 }, { 2, 1 }, true }          // protocol 1 ( MPX-X28 )
 };
 
 enum {
@@ -615,8 +603,7 @@ bool RECEIVE_ATTR RCSwitch::receiveProtocol(const int p, unsigned int changeCoun
 
     unsigned long code = 0;
     //Assuming the longer pulse length is the pulse captured in timings[0]
-    const unsigned int syncLengthInPulses =  ((pro.syncFactor.low) > (pro.syncFactor.high)) ? (pro.syncFactor.low) : (pro.syncFactor.high);
-    const unsigned int delay = RCSwitch::timings[0] / syncLengthInPulses;
+    const unsigned int delay = pro.pulseLength;
     const unsigned int delayTolerance = delay * RCSwitch::nReceiveTolerance / 100;
     
     /* For protocols that start low, the sync period looks like
@@ -676,7 +663,7 @@ void RECEIVE_ATTR RCSwitch::handleInterrupt() {
   if (duration > RCSwitch::nSeparationLimit) {
     // A long stretch without signal level change occurred. This could
     // be the gap between two transmission.
-    if ((repeatCount==0) || (diff(duration, RCSwitch::timings[0]) < 200)) {
+    if ((repeatCount==0) || (diff(duration, RCSwitch::timings[0]) < 200) || true) {
       // This long signal is close in length to the long signal which
       // started the previously recorded timings; this suggests that
       // it may indeed by a a gap between two transmissions (we assume
