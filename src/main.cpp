@@ -1,5 +1,8 @@
 #include <Arduino.h>
+#include <RCSwitch.h>
 #include "config.h"
+
+RCSwitch mySwitch = RCSwitch();
 
 bool clock_10ms, clock_10ms_ant, pulso_10ms;
 bool clock_100ms, clock_100ms_ant, pulso_100ms;
@@ -14,13 +17,18 @@ unsigned int isr_align_duration_cnt = 0;
 unsigned int loop_duration_cnt = 0;
 
 typedef union {
-  struct {
-    int overload             : 4;
-    bool underload           : 4;
-    bool adc_mask_changed    : 1;
+  struct
+  {
+    bool parity;
+    int ID : 3;
+    int cmd : 8;
+    int checksum : 4;
   };
   unsigned int word;
 } MPX_packet;
+
+MPX_packet MPX_buffer[10];
+int MPX_buffer_index;
 
 // Trama MPX
 //----------
@@ -44,9 +52,24 @@ typedef union {
 // ***********************************************************
 void setup_GPIOs()
 {
+  Serial.println("Setup GPIOs");
   pinMode(RX_PIN, INPUT);
   digitalWrite(TX_PIN, 0);
   pinMode(TX_PIN, OUTPUT);
+}
+
+void setup_RCSwitch()
+{
+  Serial.println("Setup RCSwitch: RX on pin 2. TX on pin 13");
+  
+  // Transmitter is connected to Arduino Pin #13
+  mySwitch.enableTransmit(13);
+
+  // Receiver on pin #2 => that is inerrupt 0
+  mySwitch.enableReceive(digitalPinToInterrupt(2));
+
+  // Optional set protocol (default is 1, will work for most outlets)
+  mySwitch.setProtocol(13);
 }
 
 // ***********************************************************
@@ -54,9 +77,9 @@ void setup_GPIOs()
 // ***********************************************************
 void setup()
 {
-  Serial.begin(38400);
-  Serial.println("Setup GPIOs");
+  Serial.begin(19200);
   setup_GPIOs();
+  setup_RCSwitch();
 }
 
 //********************************************************
@@ -78,15 +101,6 @@ void timers()
 }
 
 //********************************************************
-// Detector de flancos
-//
-// Detecta si es ascendente o descendente
-// mide el tiempo transcurrido desde el último cambio
-//********************************************************
-
-
-
-//********************************************************
 // Bucle principal del programa
 //********************************************************
 void loop()
@@ -94,6 +108,29 @@ void loop()
   unsigned long start_time = micros();
 
   timers();
+
+  if (mySwitch.available())
+  {
+
+    int value = mySwitch.getReceivedValue();
+
+    if (value == 0)
+    {
+      Serial.print("Unknown encoding");
+    }
+    else
+    {
+      Serial.print("Received ");
+      Serial.print(mySwitch.getReceivedValue());
+      Serial.print(" / ");
+      Serial.print(mySwitch.getReceivedBitlength());
+      Serial.print("bit ");
+      Serial.print("Protocol: ");
+      Serial.println(mySwitch.getReceivedProtocol());
+    }
+
+    mySwitch.resetAvailable();
+  }
 
   loop_duration_acum += (unsigned int)(micros() - start_time);
 
